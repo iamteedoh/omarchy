@@ -78,15 +78,36 @@ function batteryIcon(device, onBattery, states) {
   return defaultIcons[index]
 }
 
-function modeLabel(device, onBattery, states) {
+function modeLabel(device, onBattery, states, tr) {
+  var t = typeof tr === "function" ? tr : function(key, english) { return english }
   var d = device || {}
   if (!d.isPresent) return ""
 
   var percentage = d.isPresent ? d.percentage : 0
-  if (chargeThresholdActive(d, onBattery, states)) return "Threshold"
-  if (onBattery) return "On battery"
-  if (!onBattery && percentage >= 1) return "Fully charged"
-  return "Charging"
+  if (chargeThresholdActive(d, onBattery, states)) return t("power.threshold", "Threshold")
+  if (onBattery) return t("power.onBattery", "On battery")
+  if (!onBattery && percentage >= 1) return t("power.fullyCharged", "Fully charged")
+  return t("power.charging", "Charging")
+}
+
+// omarchy-battery-status --shell answers in plain digits with the unit
+// attached ("13.1W", "75-80%"); the panel writes each number in the
+// language's digits and decimal separator, keeping its decimals and unit.
+function localizeReading(raw, fmt) {
+  var f = typeof fmt === "function" ? fmt : function(v, d) { return d === undefined ? String(v) : Number(v).toFixed(d) }
+  return String(raw === undefined || raw === null ? "" : raw).replace(/\d+(?:\.\d+)?/g, function(number) {
+    var dot = number.indexOf(".")
+    return f(Number(number), dot < 0 ? undefined : number.length - dot - 1)
+  })
+}
+
+function profileLabel(name, tr) {
+  var t = typeof tr === "function" ? tr : function(key, english) { return english }
+  var value = String(name || "")
+  if (value === "power-saver") return t("power.profilePowerSaver", "Power-saver")
+  if (value === "balanced") return t("power.profileBalanced", "Balanced")
+  if (value === "performance") return t("power.profilePerformance", "Performance")
+  return value.charAt(0).toUpperCase() + value.slice(1)
 }
 
 // Battery health arrives as a display string ("72%"), hence parseInt.
@@ -104,22 +125,24 @@ function healthLevel(health) {
   return isFinite(n) && n > 0 ? n : 0
 }
 
-function healthVerdict(health) {
+function healthVerdict(health, tr) {
+  var t = typeof tr === "function" ? tr : function(key, english) { return english }
   var n = healthLevel(health)
   if (n === 0) return ""
-  if (n >= 90) return "Great"
-  if (n >= 80) return "Normal"
-  if (n >= 70) return "Worn"
-  return "Bad"
+  if (n >= 90) return t("power.healthGreat", "Great")
+  if (n >= 80) return t("power.healthNormal", "Normal")
+  if (n >= 70) return t("power.healthWorn", "Worn")
+  return t("power.healthBad", "Bad")
 }
 
-function healthHint(health) {
+function healthHint(health, tr) {
+  var t = typeof tr === "function" ? tr : function(key, english) { return english }
   var n = healthLevel(health)
   if (n === 0) return ""
-  if (n >= 90) return "Practically new"
-  if (n >= 80) return "Normal wear for its age"
-  if (n >= 70) return "Worth planning a replacement"
-  return "Time to replace it"
+  if (n >= 90) return t("power.healthPracticallyNew", "Practically new")
+  if (n >= 80) return t("power.healthNormalWear", "Normal wear for its age")
+  if (n >= 70) return t("power.healthPlanReplacement", "Worth planning a replacement")
+  return t("power.healthReplace", "Time to replace it")
 }
 
 if (typeof module !== "undefined") {
@@ -133,6 +156,8 @@ if (typeof module !== "undefined") {
     chargeThresholdActive: chargeThresholdActive,
     batteryIcon: batteryIcon,
     modeLabel: modeLabel,
+    profileLabel: profileLabel,
+    localizeReading: localizeReading,
     healthLevel: healthLevel,
     healthVerdict: healthVerdict,
     healthHint: healthHint
