@@ -80,4 +80,35 @@ assertEqual(power.healthHint('75%', (key, english) => 'translated ' + key), 'tra
 assert(/healthVerdict: Model\.healthVerdict\(batteryInfo\.health, Commons\.I18n\.t\)/.test(panelSource), 'power passes the translator to health verdicts')
 assert(/healthHint: Model\.healthHint\(batteryInfo\.health, Commons\.I18n\.t\)/.test(panelSource), 'power passes the translator to health hints')
 assert(/text: root\.reading\(root\.batteryInfo\.health\)/.test(panelSource), 'power localizes the displayed health percentage')
+
+const scrollFunction = panelSource.match(/^  function ensureProfileVisible\(\) \{[\s\S]*?^  \}/m)
+assert(scrollFunction, 'power exposes profile visibility handling for the loaded panel')
+
+function profileScroll(options = {}) {
+  const flick = {
+    contentY: 0,
+    contentHeight: 600,
+    height: 200,
+    contentItem: {},
+    ...options
+  }
+  const context = {
+    cursorActive: options.cursorActive !== false,
+    panel: { loadedContent: options.loaded === false ? null : {
+      scrollArea: { contentItem: flick },
+      profileRow: { height: options.rowHeight || 60, mapToItem: () => ({ y: options.top ?? 520 }) }
+    } },
+    Style: { space: value => value }
+  }
+  require('vm').runInNewContext(scrollFunction[0] + '\nensureProfileVisible()', context)
+  return flick.contentY
+}
+
+assertEqual(profileScroll(), 386, 'power scrolls an offscreen profile into view')
+assertEqual(profileScroll({ top: 540 }), 400, 'power stops scrolling at the end of the content')
+assertEqual(profileScroll({ top: 100, contentY: 300 }), 94, 'power brings a profile above the viewport back into view')
+assertEqual(profileScroll({ top: 120, contentY: 100 }), 100, 'power leaves a fully visible profile in place')
+assertEqual(profileScroll({ top: 100, contentHeight: 200 }), 0, 'power leaves fitting content at the top')
+assertEqual(profileScroll({ cursorActive: false }), 0, 'power keeps mouse scrolling independent of keyboard selection')
+assertEqual(profileScroll({ loaded: false }), 0, 'power handles profile selection before the content loads')
 JS
